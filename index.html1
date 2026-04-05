@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PresAI - Control de Presupuesto y Gastos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1e3a5f;
+            --bg: #f8fafc;
+            --border: #e2e8f0;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); overflow: hidden; }
+        #rotate-warning { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); color: white; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem; }
+        @media (orientation: portrait) { #rotate-warning { display: flex; } }
+        .tab-active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+        .ov { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; }
+        .mc { background: white; border-radius: 1rem; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; }
+        .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); background: white; border-radius: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f1f5f9; padding: 0.75rem; font-size: 0.65rem; text-transform: uppercase; color: #64748b; text-align: left; }
+        td { padding: 0.5rem; border-bottom: 1px solid #f1f5f9; }
+        input { width: 100%; border: none; outline: none; background: transparent; font-size: 0.875rem; }
+        input:focus { background: #f1f5f9; }
+        .ch-row { background-color: #f0f7ff; font-weight: 700; }
+        @media print { .no-print { display: none !important; } }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+    <div id="rotate-warning">
+        <i data-lucide="smartphone" class="w-16 h-16 mb-4 animate-bounce"></i>
+        <h2 class="text-2xl font-bold">Gira tu dispositivo</h2>
+        <p>Usa el modo horizontal para una mejor experiencia.</p>
+    </div>
+
+    <header class="bg-[#1e3a5f] text-white px-4 py-2 flex items-center justify-between no-print">
+        <div class="flex items-center gap-3">
+            <i data-lucide="calculator" class="w-6 h-6"></i>
+            <h1 class="text-lg font-bold">Pres<span class="text-blue-300">AI</span></h1>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="newProject()" class="p-2 hover:bg-white/10 rounded"><i data-lucide="plus" class="w-4 h-4"></i></button>
+            <button onclick="saveProject()" class="p-2 hover:bg-white/10 rounded"><i data-lucide="save" class="w-4 h-4"></i></button>
+            <button onclick="previewProject()" class="bg-blue-500 px-3 py-1 rounded text-xs font-bold">Vista Previa</button>
+        </div>
+    </header>
+
+    <nav class="bg-white border-b flex px-4 no-print">
+        <button onclick="sw('bud')" id="tab-bud" class="px-4 py-3 text-xs font-bold tab-active">Presupuesto</button>
+        <button onclick="sw('gg')" id="tab-gg" class="px-4 py-3 text-xs font-bold text-slate-400">Gastos Generales</button>
+    </nav>
+
+    <main class="flex-1 overflow-y-auto p-4 space-y-4">
+        <div id="pnl-bud" class="space-y-4">
+            <div class="bg-white p-4 rounded-lg border shadow-sm no-print">
+                <input id="proj-obra" type="text" placeholder="Nombre de la Obra" class="text-lg font-bold border-b mb-2">
+                <div class="grid grid-cols-2 gap-4">
+                    <input id="proj-mandante" type="text" placeholder="Mandante" class="text-sm border-b">
+                    <input id="proj-ubicacion" type="text" placeholder="Ubicación" class="text-sm border-b">
+                </div>
+            </div>
+            <div class="tbl-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:50px">Item</th>
+                            <th>Descripción</th>
+                            <th style="width:60px">Unid</th>
+                            <th style="width:80px; text-align:right">Cant</th>
+                            <th style="width:100px; text-align:right">Precio</th>
+                            <th style="width:120px; text-align:right">Total</th>
+                            <th style="width:80px" class="no-print"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-budget"></tbody>
+                </table>
+                <div class="p-2 bg-slate-50 flex gap-2 no-print">
+                    <button onclick="addItem('ch')" class="text-[10px] font-bold border px-2 py-1 rounded bg-white">+ Capítulo</button>
+                    <button onclick="addItem('it')" class="text-[10px] font-bold border px-2 py-1 rounded bg-white">+ Partida</button>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-lg border shadow-sm space-y-2">
+                <div class="flex justify-between text-sm"><span>Costo Directo</span> <span id="tot-direct">$ 0</span></div>
+                <div class="flex justify-between text-sm"><span>Gastos Generales</span> <span id="tot-gg">$ 0</span></div>
+                <div class="flex justify-between font-bold text-lg border-t pt-2"><span>TOTAL NETO</span> <span id="tot-net">$ 0</span></div>
+            </div>
+        </div>
+
+        <div id="pnl-gg" class="hidden space-y-4 pb-20">
+            <div id="gg-sections-container" class="space-y-4"></div>
+            <div class="flex justify-center no-print">
+                <button onclick="toggleGGDropdown()" class="bg-[#1e3a5f] text-white px-6 py-2 rounded-full font-bold text-xs">AGREGAR CAMPO 🔻</button>
+                <div id="gg-dropdown" class="hidden absolute bg-white border shadow-xl rounded-lg mt-10 z-50 w-48">
+                    <div id="gg-dropdown-list"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="modal-ov" class="ov no-print" onclick="closeModal()">
+        <div class="mc" id="modal-content" onclick="event.stopPropagation()"></div>
+    </div>
+
+    <script>
+        let items = [{id:'1',t:'ch',num:'1.-',name:'OBRAS PRELIMINARES',unit:'',qty:0,price:0}];
+        let ggItems = [];
+        let activeGGSubgroups = ['Otros'];
+        const ALL_GG = ['Personal supervisión','Personal técnico','Maquinaria y equipos','Elementos de seguridad','Consumos de obra','Herramientas menores','Otros'];
+
+        function init() { lucide.createIcons(); rb(); renderGG(); rc(); }
+        function sw(id) {
+            ['bud','gg'].forEach(p => {
+                document.getElementById('pnl-'+p).classList.add('hidden');
+                document.getElementById('tab-'+p).classList.remove('tab-active');
+                document.getElementById('tab-'+p).classList.add('text-slate-400');
+            });
+            document.getElementById('pnl-'+id).classList.remove('hidden');
+            document.getElementById('tab-'+id).classList.add('tab-active');
+            if(id==='gg') renderGG();
+        }
+
+        function rb() {
+            const tbody = document.getElementById('tbody-budget');
+            tbody.innerHTML = items.map(it => `
+                <tr class="${it.t==='ch'?'ch-row':''}">
+                    <td><input value="${it.num}" oninput="upd('${it.id}','num',this.value)"></td>
+                    <td><input value="${it.name}" oninput="upd('${it.id}','name',this.value)"></td>
+                    <td>${it.t==='it'?`<input value="${it.unit}" oninput="upd('${it.id}','unit',this.value)">`:''}</td>
+                    <td>${it.t==='it'?`<input type="number" value="${it.qty}" oninput="upd('${it.id}','qty',this.value)" style="text-align:right">`:''}</td>
+                    <td>${it.t==='it'?`<input type="number" value="${it.price}" oninput="upd('${it.id}','price',this.value)" style="text-align:right">`:''}</td>
+                    <td style="text-align:right">$ ${fmt(it.t==='ch'?getChTot(it.id):it.qty*it.price)}</td>
+                    <td class="no-print"><button onclick="del('${it.id}')">×</button></td>
+                </tr>
+            `).join('');
+        }
+
+        function upd(id,f,v) { 
+            let it = items.find(x=>x.id===id); 
+            it[f] = (f==='qty'||f==='price')?Number(v):v; 
+            if(it.t==='ch') rb(); rc(); 
+        }
+
+        function renderGG() {
+            const container = document.getElementById('gg-sections-container');
+            container.innerHTML = activeGGSubgroups.map(sg => {
+                const sItems = ggItems.filter(x => x.sub === sg);
+                const subTot = sItems.reduce((a,b) => a + (b.qty * b.time * b.price), 0);
+                return `
+                    <div class="bg-white border rounded-lg shadow-sm">
+                        <div class="bg-slate-50 p-2 font-bold text-xs flex justify-between">
+                            <span>${sg}</span>
+                            <button onclick="remGGS('${sg}')" class="text-red-500">×</button>
+                        </div>
+                        <table class="text-xs">
+                            <thead><tr class="bg-slate-100"><th>Descripción</th><th>Cant</th><th>Tiempo Uso</th><th>Precio</th><th>Total</th><th></th></tr></thead>
+                            <tbody>${sItems.map(it => `
+                                <tr>
+                                    <td><input value="${it.name}" oninput="updGG('${it.id}','name',this.value)"></td>
+                                    <td><input type="number" value="${it.qty}" oninput="updGG('${it.id}','qty',this.value)"></td>
+                                    <td class="bg-blue-50"><input type="number" value="${it.time}" oninput="updGG('${it.id}','time',this.value)"></td>
+                                    <td><input type="number" value="${it.price}" oninput="updGG('${it.id}','price',this.value)"></td>
+                                    <td class="text-right">$ ${fmt(it.qty*it.time*it.price)}</td>
+                                    <td><button onclick="delGG('${it.id}')">×</button></td>
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                        <div class="p-2 flex justify-between items-center border-t">
+                            <button onclick="addGGI('${sg}')" class="text-[10px] bg-blue-50 px-2 py-1 rounded">+ Gasto</button>
+                            <span class="font-bold">Subtotal: $ ${fmt(subTot)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            updateGGDropdown();
+        }
+
+        function updGG(id,f,v) { 
+            let it = ggItems.find(x=>x.id===id); 
+            it[f] = (f==='qty'||f==='price'||f==='time')?Number(v):v; 
+            renderGG(); rc(); 
+        }
+
+        function rc() {
+            const direct = items.reduce((a,b) => b.t==='it'? a+(b.qty*b.price) : a, 0);
+            const gg = ggItems.reduce((a,b) => a+(b.qty*b.time*b.price), 0);
+            document.getElementById('tot-direct').textContent = '$ ' + fmt(direct);
+            document.getElementById('tot-gg').textContent = '$ ' + fmt(gg);
+            document.getElementById('tot-net').textContent = '$ ' + fmt(direct + gg);
+        }
+
+        function toggleGGDropdown() { document.getElementById('gg-dropdown').classList.toggle('hidden'); }
+        function updateGGDropdown() {
+            const list = document.getElementById('gg-dropdown-list');
+            const avail = ALL_GG.filter(x => !activeGGSubgroups.includes(x));
+            list.innerHTML = avail.map(sg => `<button onclick="addGGS('${sg}')" class="w-full text-left p-2 hover:bg-slate-100 text-xs">${sg}</button>`).join('');
+        }
+        function addGGS(sg) { activeGGSubgroups.push(sg); renderGG(); toggleGGDropdown(); }
+        function remGGS(sg) { activeGGSubgroups = activeGGSubgroups.filter(x=>x!==sg); ggItems = ggItems.filter(x=>x.sub!==sg); renderGG(); rc(); }
+        function addGGI(sg) { ggItems.push({id:Math.random().toString(36).substr(2,9), name:'', qty:1, time:1, price:0, sub:sg}); renderGG(); }
+        function delGG(id) { ggItems = ggItems.filter(x=>x.id!==id); renderGG(); rc(); }
+        function addItem(t) { items.push({id:Math.random().toString(36).substr(2,9), t, num:'', name:'', unit:'un', qty:1, price:0}); rb(); }
+        function del(id) { items = items.filter(x=>x.id!==id); rb(); rc(); }
+        function getChTot(id) { 
+            let t=0, f=false; 
+            for(let it of items) { if(it.id===id){f=true;continue;} if(f){ if(it.t==='ch')break; t+=it.qty*it.price; } } 
+            return t; 
+        }
+        function fmt(n) { return n.toLocaleString('es-CL'); }
+        function closeModal() { document.getElementById('modal-ov').style.display='none'; }
+        function previewProject() {
+            const mc = document.getElementById('modal-content');
+            document.getElementById('modal-ov').style.display='flex';
+            mc.innerHTML = `<div class="p-6">
+                <h2 class="text-xl font-bold mb-4">Vista Previa</h2>
+                <p class="text-sm mb-4">Obra: ${document.getElementById('proj-obra').value}</p>
+                <table class="text-xs w-full mb-4 border">
+                    ${items.map(it => `<tr><td>${it.num}</td><td>${it.name}</td><td class="text-right">$ ${fmt(it.t==='ch'?getChTot(it.id):it.qty*it.price)}</td></tr>`).join('')}
+                </table>
+                <button onclick="closeModal()" class="bg-slate-800 text-white px-4 py-2 rounded">Cerrar</button>
+            </div>`;
+        }
+        window.onload = init;
+    </script>
+</body>
+</html>
